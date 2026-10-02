@@ -1,0 +1,7 @@
+{
+  "name": "NEWPHORIA – Personalized Travel Planning and Digital Travel Management System",
+  "description": "Interactive travel planning and digital travel management system with personalized itineraries, budget calculations, digital memories scrapbook, and destination discovery for Goa, Gokarna, Ooty, and Pondicherry.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
