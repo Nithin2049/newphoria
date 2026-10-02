@@ -1,23 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Mountain, Menu, X, Compass, Calendar, Heart, MessageSquare, MapPin } from 'lucide-react';
+import { Mountain, Menu, X, Compass, Calendar, Heart, MessageSquare, MapPin, User as UserIcon, LogOut } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface NavbarProps {
   savedTripsCount: number;
   onNavigate: (sectionId: string) => void;
   activeSection: string;
+  onOpenAuthModal: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   savedTripsCount,
   onNavigate,
   activeSection,
+  onOpenAuthModal,
 }) => {
+  const { user, logout } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
-      // If scrolled down more than 100px from top
       if (window.scrollY > 80) {
         setIsScrolled(true);
       } else {
@@ -118,10 +121,66 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
               );
             })}
+
+            {/* Auth Button */}
+            <div className="pl-2 border-l border-stone-300/30">
+              {user ? (
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
+                      isScrolled
+                        ? 'bg-stone-100 text-stone-800 border-stone-200'
+                        : 'bg-white/15 text-white border-white/25'
+                    }`}
+                  >
+                    <div className="w-5 h-5 rounded-full bg-[#f04141] text-white flex items-center justify-center text-[10px] uppercase font-bold">
+                      {user.displayName?.[0] || user.email?.[0] || 'U'}
+                    </div>
+                    <span className="max-w-[90px] truncate">
+                      {user.displayName || user.email?.split('@')[0]}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => logout()}
+                    className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                      isScrolled
+                        ? 'text-stone-500 hover:text-red-600 hover:bg-red-50'
+                        : 'text-stone-300 hover:text-white hover:bg-white/10'
+                    }`}
+                    title="Sign Out"
+                    aria-label="Sign Out"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={onOpenAuthModal}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                    isScrolled
+                      ? 'bg-stone-900 hover:bg-stone-800 text-white'
+                      : 'bg-white hover:bg-stone-100 text-stone-900'
+                  }`}
+                >
+                  <UserIcon className="w-3.5 h-3.5" />
+                  <span>SIGN IN</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Mobile Menu Button */}
-          <div className="flex md:hidden items-center">
+          <div className="flex md:hidden items-center gap-2">
+            {!user && (
+              <button
+                onClick={onOpenAuthModal}
+                className={`px-2.5 py-1 rounded text-[11px] font-bold uppercase tracking-wider ${
+                  isScrolled ? 'bg-stone-900 text-white' : 'bg-white text-stone-900'
+                }`}
+              >
+                Sign In
+              </button>
+            )}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className={`p-2 rounded-lg transition-colors cursor-pointer focus:outline-none ${
@@ -140,6 +199,47 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-white/98 text-stone-900 border-b border-stone-200 shadow-xl px-4 pt-3 pb-6 space-y-2 animate-in fade-in slide-in-from-top-4 duration-200">
+          {/* Mobile User Profile */}
+          {user ? (
+            <div className="p-3 bg-stone-100 rounded-xl mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-[#f04141] text-white flex items-center justify-center font-bold text-xs uppercase">
+                  {user.displayName?.[0] || user.email?.[0] || 'U'}
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-stone-900">
+                    {user.displayName || 'Traveler'}
+                  </div>
+                  <div className="text-[11px] text-stone-500 truncate max-w-[170px]">
+                    {user.email}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  logout();
+                  setMobileMenuOpen(false);
+                }}
+                className="px-2.5 py-1 bg-white border border-stone-200 hover:bg-red-50 text-red-600 rounded text-xs font-bold transition-colors cursor-pointer"
+              >
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <div className="mb-3">
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenAuthModal();
+                }}
+                className="w-full py-2.5 bg-stone-900 text-white rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <UserIcon className="w-4 h-4" />
+                <span>Sign In / Create Account</span>
+              </button>
+            </div>
+          )}
+
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeSection === item.id;
@@ -170,3 +270,4 @@ export const Navbar: React.FC<NavbarProps> = ({
     </nav>
   );
 };
+

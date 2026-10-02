@@ -103,6 +103,8 @@ export interface SavedTrip {
   id: string;
   itinerary: GeneratedItinerary;
   savedAt: string;
+  userId?: string;
+  firestoreId?: string;
 }
 
 export interface TravelMemory {
@@ -113,6 +115,8 @@ export interface TravelMemory {
   caption: string;
   photoUrl: string;
   createdAt: string;
+  userId?: string;
+  storagePath?: string;
 }
 
 export interface ContactMessage {

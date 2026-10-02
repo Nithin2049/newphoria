@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { submitContactMessageToFirestore } from '../services/firebaseService';
 import {
   Mail,
   User,
@@ -8,6 +9,8 @@ import {
   CheckCircle,
   MapPin,
   Sparkles,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
 
 export const ContactSection: React.FC = () => {
@@ -16,66 +19,46 @@ export const ContactSection: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
-
-  // Exact Firebase configuration preserved from contact.html
-  const FIREBASE_CONFIG = {
-    apiKey: 'AIzaSyAHVxziVcl2tgHowEyu-I19yDALHOblIk4',
-    authDomain: 'newphoria-c73c2.firebaseapp.com',
-    projectId: 'newphoria-c73c2',
-    storageBucket: 'newphoria-c73c2.appspot.com',
-    messagingSenderId: '615698919659',
-    appId: '1:615698919659:web:c1c1b4904f6d78eaab0eae',
-    measurementId: 'G-KGXV121T0L',
-    databaseURL: 'https://newphoria-c73c2-default-rtdb.firebaseio.com',
-  };
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('submitting');
+    setErrorMessage(null);
 
     const contactPayload = {
       username: username.trim(),
       email: email.trim(),
-      PhoneNumber: phone.trim(),
+      phoneNumber: phone.trim(),
       message: message.trim(),
-      submittedAt: new Date().toISOString(),
     };
 
-    // 1. Always save in localStorage backup
+    // 1. Local backup
     try {
       const existing = JSON.parse(localStorage.getItem('newphoria_contact_messages') || '[]');
-      existing.push(contactPayload);
+      existing.push({ ...contactPayload, submittedAt: new Date().toISOString() });
       localStorage.setItem('newphoria_contact_messages', JSON.stringify(existing));
     } catch (e) {
       console.warn('Local storage error:', e);
     }
 
-    // 2. Transmit to Firebase Realtime Database
+    // 2. Submit to Firebase Firestore (collection: contactMessages)
     try {
-      const cleanKey = username.replace(/[^a-zA-Z0-9_]/g, '_') || `user_${Date.now()}`;
-      await fetch(
-        `${FIREBASE_CONFIG.databaseURL}/user/${cleanKey}.json`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(contactPayload),
-        }
+      await submitContactMessageToFirestore(contactPayload);
+      setStatus('success');
+      setUsername('');
+      setEmail('');
+      setPhone('');
+      setMessage('');
+    } catch (err: any) {
+      console.error('Contact form submission error:', err);
+      setStatus('error');
+      setErrorMessage(
+        err?.message || 'Failed to submit message to Firebase Firestore. Please check your network connection and try again.'
       );
-      setStatus('success');
-      setUsername('');
-      setEmail('');
-      setPhone('');
-      setMessage('');
-    } catch (err) {
-      // Still show success since local record was safely logged
-      console.info('Firebase sync completed with local storage persistence.');
-      setStatus('success');
-      setUsername('');
-      setEmail('');
-      setPhone('');
-      setMessage('');
     }
   };
+
 
   return (
     <section
@@ -131,7 +114,7 @@ export const ContactSection: React.FC = () => {
                 Send Us a Message
               </h3>
               <p className="text-xs text-stone-300 mb-6 text-center sm:text-left">
-                Integrated with Firebase Realtime Database
+                Integrated with Firebase Firestore (contactMessages)
               </p>
 
               {status === 'success' ? (
@@ -150,6 +133,13 @@ export const ContactSection: React.FC = () => {
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  {errorMessage && (
+                    <div className="p-3.5 rounded-xl bg-red-950/80 border border-red-500/50 text-red-200 text-xs flex items-start gap-2.5">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+                      <span className="leading-relaxed">{errorMessage}</span>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-stone-300 mb-1">
                       Full Name

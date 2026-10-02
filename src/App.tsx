@@ -6,6 +6,12 @@ import {
   TripPlanRequest,
 } from './types/travel';
 import { generatePersonalizedItinerary } from './utils/itineraryEngine';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import {
+  saveTripToFirestore,
+  loadUserTripsFromFirestore,
+  deleteTripFromFirestore,
+} from './services/firebaseService';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { Services } from './components/Services';
@@ -16,34 +22,65 @@ import { MyTrips } from './components/MyTrips';
 import { MemoriesSection } from './components/MemoriesSection';
 import { ContactSection } from './components/ContactSection';
 import { Footer } from './components/Footer';
+import { AuthModal } from './components/AuthModal';
 
 const SAVED_TRIPS_KEY = 'newphoria_saved_trips';
 
-export default function App() {
+function MainApp() {
+  const { user } = useAuth();
   const [savedTrips, setSavedTrips] = useState<SavedTrip[]>([]);
+  const [loadingTrips, setLoadingTrips] = useState(false);
   const [currentItinerary, setCurrentItinerary] = useState<GeneratedItinerary | null>(null);
   const [plannerDestination, setPlannerDestination] = useState<DestinationId>('goa');
   const [activeNavSection, setActiveNavSection] = useState<string>('hero');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authPrompt, setAuthPrompt] = useState<string | undefined>();
 
-  // Load saved trips from localStorage on mount
+  // Sync trips when user auth state changes
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(SAVED_TRIPS_KEY);
-      if (stored) {
-        setSavedTrips(JSON.parse(stored));
+    let isMounted = true;
+
+    async function syncTrips() {
+      if (user) {
+        setLoadingTrips(true);
+        try {
+          const cloudTrips = await loadUserTripsFromFirestore(user.uid);
+          if (isMounted) {
+            setSavedTrips(cloudTrips);
+          }
+        } catch (err) {
+          console.warn('Could not load trips from Firestore, using local fallback:', err);
+          if (isMounted) {
+            const local = localStorage.getItem(SAVED_TRIPS_KEY);
+            setSavedTrips(local ? JSON.parse(local) : []);
+          }
+        } finally {
+          if (isMounted) setLoadingTrips(false);
+        }
+      } else {
+        // Fallback to local storage when not signed in
+        try {
+          const local = localStorage.getItem(SAVED_TRIPS_KEY);
+          setSavedTrips(local ? JSON.parse(local) : []);
+        } catch (e) {
+          console.error(e);
+        }
       }
-    } catch (e) {
-      console.error('Failed to load saved trips from localStorage', e);
     }
-  }, []);
+
+    syncTrips();
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
 
   // Show transient toast
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage(null);
-    }, 3500);
+    }, 3800);
   };
 
   // Smooth scroll helper that accounts for fixed navbar offset
@@ -56,7 +93,7 @@ export default function App() {
 
     const element = document.getElementById(sectionId);
     if (element) {
-      const yOffset = -75; // Account for 72px fixed header
+      const yOffset = -75;
       const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
       window.scrollTo({ top: y, behavior: 'smooth' });
     }
@@ -69,7 +106,6 @@ export default function App() {
       setCurrentItinerary(generated);
       triggerToast(`Generated customized ${generated.days}-day itinerary for ${generated.destinationName}!`);
 
-      // Smooth scroll to results
       setTimeout(() => {
         const resultsEl = document.getElementById('itinerary-results');
         if (resultsEl) {
@@ -84,15 +120,50 @@ export default function App() {
     }
   };
 
-  // Handle Save Trip to localStorage
-  const handleSaveTrip = (itineraryToSave: GeneratedItinerary) => {
-    const isAlreadySaved = savedTrips.some((t) => t.itinerary.id === itineraryToSave.id);
+  // Handle Save Trip to Firestore & Local Storage
+  const handleSaveTrip = async (itineraryToSave: GeneratedItinerary) => {
+    const isAlreadySaved = savedTrips.some(
+      (t) => t.itinerary.id === itineraryToSave.id || t.id === itineraryToSave.id
+    );
 
     if (isAlreadySaved) {
       triggerToast('This itinerary is already in your My Trips collection.');
       return;
     }
 
+    // If user is authenticated, save directly to Firestore
+    if (user) {
+      try {
+        const firestoreId = await saveTripToFirestore(user.uid, itineraryToSave);
+        const newTrip: SavedTrip = {
+          id: itineraryToSave.id,
+          firestoreId,
+          userId: user.uid,
+          itinerary: itineraryToSave,
+          savedAt: new Date().toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          }),
+        };
+        setSavedTrips((prev) => [newTrip, ...prev]);
+        triggerToast(`Saved ${itineraryToSave.destinationName} trip to your Firebase cloud account!`);
+      } catch (err: any) {
+        console.error('Failed to save to Firestore:', err);
+        // Local fallback
+        saveLocally(itineraryToSave);
+        triggerToast('Saved locally. (Check Firestore rules or network connection)');
+      }
+    } else {
+      // Save locally and prompt for auth
+      saveLocally(itineraryToSave);
+      setAuthPrompt('Sign in to sync your saved trips to Firebase Firestore across all devices.');
+      setAuthModalOpen(true);
+      triggerToast(`Saved ${itineraryToSave.destinationName} trip locally. Sign in to sync to cloud!`);
+    }
+  };
+
+  const saveLocally = (itineraryToSave: GeneratedItinerary) => {
     const newSavedTrip: SavedTrip = {
       id: `saved-${Date.now()}`,
       itinerary: itineraryToSave,
@@ -102,26 +173,32 @@ export default function App() {
         year: 'numeric',
       }),
     };
-
     const updated = [newSavedTrip, ...savedTrips];
     setSavedTrips(updated);
     try {
       localStorage.setItem(SAVED_TRIPS_KEY, JSON.stringify(updated));
-      triggerToast(`Saved ${itineraryToSave.destinationName} trip to My Trips!`);
     } catch (e) {
       console.error('Storage error', e);
     }
   };
 
-  // Delete trip
-  const handleDeleteTrip = (tripId: string) => {
-    const updated = savedTrips.filter((t) => t.id !== tripId);
-    setSavedTrips(updated);
+  // Delete trip from Firestore & Local Storage
+  const handleDeleteTrip = async (trip: SavedTrip) => {
     try {
+      if (user && trip.firestoreId) {
+        await deleteTripFromFirestore(user.uid, trip.firestoreId);
+      }
+      const updated = savedTrips.filter(
+        (t) => (t.firestoreId && t.firestoreId !== trip.firestoreId) || t.id !== trip.id
+      );
+      setSavedTrips(updated);
       localStorage.setItem(SAVED_TRIPS_KEY, JSON.stringify(updated));
       triggerToast('Trip removed from My Trips.');
-    } catch (e) {
-      console.error(e);
+    } catch (err: any) {
+      console.error('Failed to delete trip:', err);
+      const updated = savedTrips.filter((t) => t.id !== trip.id);
+      setSavedTrips(updated);
+      triggerToast('Trip removed locally.');
     }
   };
 
@@ -138,15 +215,21 @@ export default function App() {
     }, 100);
   };
 
-  // When a destination card clicks "Plan Trip Here"
   const handleSelectDestinationForPlan = (destId: DestinationId) => {
     setPlannerDestination(destId);
     scrollToSection('plan-trip');
   };
 
   const isCurrentItinerarySaved = currentItinerary
-    ? savedTrips.some((t) => t.itinerary.id === currentItinerary.id)
+    ? savedTrips.some(
+        (t) => t.itinerary.id === currentItinerary.id || t.id === currentItinerary.id
+      )
     : false;
+
+  const handleOpenAuth = (prompt?: string) => {
+    setAuthPrompt(prompt);
+    setAuthModalOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-[#fafaf9] text-stone-900 flex flex-col selection:bg-red-500 selection:text-white">
@@ -155,6 +238,7 @@ export default function App() {
         savedTripsCount={savedTrips.length}
         onNavigate={scrollToSection}
         activeSection={activeNavSection}
+        onOpenAuthModal={() => handleOpenAuth()}
       />
 
       {/* Main Content Area */}
@@ -187,23 +271,34 @@ export default function App() {
           />
         )}
 
-        {/* My Trips (Stored in LocalStorage) */}
+        {/* My Trips (Stored in Firestore with Local Persistence) */}
         <MyTrips
           savedTrips={savedTrips}
+          loading={loadingTrips}
           onViewTrip={handleViewTrip}
           onDeleteTrip={handleDeleteTrip}
           onPlanNewTrip={() => scrollToSection('plan-trip')}
+          onOpenAuthModal={() => handleOpenAuth('Sign in to access your cloud-saved itineraries.')}
         />
 
-        {/* Digital Scrapbook Memories Section */}
-        <MemoriesSection />
+        {/* Digital Scrapbook Memories Section (Firebase Storage & Firestore) */}
+        <MemoriesSection
+          onOpenAuthModal={() => handleOpenAuth('Sign in to upload travel photos to Firebase Storage.')}
+        />
 
-        {/* Contact Section with Firebase Realtime Database Config */}
+        {/* Contact Section (Firebase Firestore contactMessages collection) */}
         <ContactSection />
       </main>
 
       {/* Footer */}
       <Footer onNavigate={scrollToSection} />
+
+      {/* Authentication Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        promptMessage={authPrompt}
+      />
 
       {/* Floating Notification Toast */}
       {toastMessage && (
@@ -213,5 +308,13 @@ export default function App() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
   );
 }
