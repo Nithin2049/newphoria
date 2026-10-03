@@ -10,7 +10,6 @@ import {
   Compass,
   Calendar,
   Wallet,
-  Sparkles,
   Check,
   AlertCircle,
   Sun,
@@ -21,19 +20,33 @@ import {
   ShoppingBag,
   Footprints,
   Waves,
+  Users,
+  Loader2,
+  Globe,
+  Hotel,
+  UtensilsCrossed,
+  Sparkles,
 } from 'lucide-react';
 
 interface TripPlannerProps {
   onGenerateItinerary: (request: TripPlanRequest) => void;
+  isGenerating?: boolean;
   initialDestination?: DestinationId;
 }
 
 export const TripPlanner: React.FC<TripPlannerProps> = ({
   onGenerateItinerary,
+  isGenerating = false,
   initialDestination = 'goa',
 }) => {
   const [destination, setDestination] = useState<DestinationId>(initialDestination);
   const [days, setDays] = useState<1 | 2 | 3>(3);
+  const [startDate, setStartDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split('T')[0];
+  });
+  const [travelers, setTravelers] = useState<number>(1);
   const [budgetInput, setBudgetInput] = useState<string>('12000');
   const [travelStyle, setTravelStyle] = useState<TravelStyle>('Mixed');
   const [selectedInterests, setSelectedInterests] = useState<Interest[]>([
@@ -41,6 +54,14 @@ export const TripPlanner: React.FC<TripPlannerProps> = ({
     'Food',
     'History',
   ]);
+  const [preferredActivities, setPreferredActivities] = useState<string[]>([
+    'Heritage Walks',
+    'Sunset Viewpoint',
+  ]);
+  const [foodPreference, setFoodPreference] = useState<string>('Local Coastal & Seafood');
+  const [accommodationPreference, setAccommodationPreference] = useState<string>(
+    'Boutique Resort'
+  );
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const allInterests: { id: Interest; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -62,6 +83,33 @@ export const TripPlanner: React.FC<TripPlannerProps> = ({
     { id: 'Mixed', label: 'Mixed', desc: 'Balanced highlights across all facets' },
   ];
 
+  const activityOptions = [
+    'Watersports & Kayaking',
+    'Heritage Walks & Forts',
+    'Sunset Viewpoint',
+    'Local Night Markets',
+    'Cafe Hopping',
+    'Hill Treks & Trails',
+    'Boat Cruise',
+    'Ayurvedic Wellness & Spa',
+  ];
+
+  const foodOptions = [
+    'Local Coastal & Seafood',
+    'Pure Vegetarian & Jain',
+    'Traditional Regional Thali',
+    'Cafes & Continental / Italian',
+    'Street Food & Night Stalls',
+  ];
+
+  const accommodationOptions = [
+    'Boutique Resort',
+    'Budget Homestay & Guesthouse',
+    'Heritage Villa & Colonial Manor',
+    'Backpacker Hostel',
+    'Premium 4/5-Star Hotel',
+  ];
+
   const toggleInterest = (interest: Interest) => {
     if (selectedInterests.includes(interest)) {
       if (selectedInterests.length > 1) {
@@ -72,8 +120,15 @@ export const TripPlanner: React.FC<TripPlannerProps> = ({
     }
   };
 
+  const toggleActivity = (activity: string) => {
+    if (preferredActivities.includes(activity)) {
+      setPreferredActivities(preferredActivities.filter((a) => a !== activity));
+    } else {
+      setPreferredActivities([...preferredActivities, activity]);
+    }
+  };
+
   const handleBudgetChange = (val: string) => {
-    // Only numbers allowed
     const clean = val.replace(/\D/g, '');
     setBudgetInput(clean);
   };
@@ -88,7 +143,6 @@ export const TripPlanner: React.FC<TripPlannerProps> = ({
 
     const numericBudget = parseInt(budgetInput, 10);
 
-    // Validation
     if (isNaN(numericBudget) || numericBudget < 1500) {
       setValidationError('Please enter a valid trip budget of at least ₹1,500 to cover accommodation and activities.');
       return;
@@ -102,11 +156,19 @@ export const TripPlanner: React.FC<TripPlannerProps> = ({
     onGenerateItinerary({
       destination,
       days,
+      startDate,
       budget: numericBudget,
+      travelers,
       travelStyle,
       interests: selectedInterests,
+      preferredActivities,
+      foodPreference,
+      accommodationPreference,
     });
   };
+
+  const numBudget = parseInt(budgetInput, 10) || 0;
+  const budgetPerPerson = travelers > 0 ? Math.round(numBudget / travelers) : numBudget;
 
   return (
     <section id="plan-trip" className="py-20 bg-white scroll-mt-20">
@@ -114,14 +176,14 @@ export const TripPlanner: React.FC<TripPlannerProps> = ({
         {/* Section Heading */}
         <div className="text-center max-w-3xl mx-auto mb-12">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 text-[#f04141] text-xs font-bold uppercase tracking-wider mb-2">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Interactive Itinerary Engine</span>
+            <Globe className="w-3.5 h-3.5" />
+            <span>Live Online Travel Intelligence</span>
           </div>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-stone-900 tracking-tight">
             Plan Your Personalized Trip
           </h2>
           <p className="mt-3 text-base text-stone-600">
-            Tell us where you want to go, your travel duration, total budget, and passions. Our algorithm will generate a realistic, tailored daily schedule with maps and financial estimates.
+            Tell us your travel dates, group size, budget, dining tastes, and preferred stay. NEWPHORIA cross-references live online travel data, weather forecasts, and verified attractions to build your optimized day-by-day itinerary.
           </p>
         </div>
 
@@ -184,20 +246,42 @@ export const TripPlanner: React.FC<TripPlannerProps> = ({
             </div>
           </div>
 
-          {/* 2. Number of Days & Budget Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-stone-200">
-            {/* Number of Days */}
+          {/* 2. Dates, Duration, Travelers & Budget Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-4 border-t border-stone-200">
+            {/* Travel Date */}
             <div>
-              <label className="text-base font-bold text-stone-900 flex items-center gap-2 mb-3">
-                <span className="w-6 h-6 rounded-full bg-stone-900 text-white text-xs flex items-center justify-center font-mono">
+              <label className="text-sm font-bold text-stone-900 flex items-center gap-2 mb-2.5">
+                <span className="w-5 h-5 rounded-full bg-stone-900 text-white text-[11px] flex items-center justify-center font-mono">
                   2
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-stone-500" />
-                  Trip Duration
+                  Travel Date
                 </span>
               </label>
-              <div className="grid grid-cols-3 gap-3">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-stone-300 rounded-xl text-stone-900 font-semibold text-xs sm:text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:outline-none transition-colors"
+              />
+              <span className="text-[10px] text-stone-500 mt-1 block">
+                Synchronizes with live weather forecast
+              </span>
+            </div>
+
+            {/* Number of Days */}
+            <div>
+              <label className="text-sm font-bold text-stone-900 flex items-center gap-2 mb-2.5">
+                <span className="w-5 h-5 rounded-full bg-stone-900 text-white text-[11px] flex items-center justify-center font-mono">
+                  3
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-stone-500" />
+                  Duration
+                </span>
+              </label>
+              <div className="grid grid-cols-3 gap-2">
                 {[1, 2, 3].map((num) => {
                   const isSelected = days === num;
                   return (
@@ -205,15 +289,55 @@ export const TripPlanner: React.FC<TripPlannerProps> = ({
                       type="button"
                       key={num}
                       onClick={() => setDays(num as 1 | 2 | 3)}
-                      className={`py-3 px-4 rounded-xl border text-center font-semibold text-sm transition-all cursor-pointer ${
+                      className={`py-2 px-1.5 rounded-xl border text-center font-semibold text-xs transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-[#f04141] text-white border-[#f04141] shadow-sm'
+                          ? 'bg-[#f04141] text-white border-[#f04141] shadow-xs'
                           : 'bg-white text-stone-700 border-stone-300 hover:border-stone-400'
                       }`}
                     >
-                      <div className="text-lg font-bold">{num} {num === 1 ? 'Day' : 'Days'}</div>
-                      <div className={`text-[11px] ${isSelected ? 'text-red-100' : 'text-stone-500'}`}>
-                        {num === 1 ? 'Quick escape' : num === 2 ? 'Weekend trip' : 'Complete tour'}
+                      <div className="text-sm font-bold">{num} {num === 1 ? 'Day' : 'Days'}</div>
+                      <div className={`text-[10px] ${isSelected ? 'text-red-100' : 'text-stone-500'}`}>
+                        {num === 1 ? 'Quick' : num === 2 ? 'Weekend' : 'Complete'}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Number of Travelers */}
+            <div>
+              <label className="text-sm font-bold text-stone-900 flex items-center gap-2 mb-2.5">
+                <span className="w-5 h-5 rounded-full bg-stone-900 text-white text-[11px] flex items-center justify-center font-mono">
+                  4
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-stone-500" />
+                  Travelers
+                </span>
+              </label>
+              <div className="grid grid-cols-4 gap-1">
+                {[
+                  { count: 1, label: 'Solo' },
+                  { count: 2, label: 'Duo' },
+                  { count: 4, label: 'Group' },
+                  { count: 6, label: 'Family' },
+                ].map((item) => {
+                  const isSelected = travelers === item.count;
+                  return (
+                    <button
+                      type="button"
+                      key={item.count}
+                      onClick={() => setTravelers(item.count)}
+                      className={`py-2 px-1 rounded-xl border text-center font-semibold text-xs transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#f04141] text-white border-[#f04141] shadow-xs'
+                          : 'bg-white text-stone-700 border-stone-300 hover:border-stone-400'
+                      }`}
+                    >
+                      <div className="text-sm font-bold">{item.count}</div>
+                      <div className={`text-[9px] ${isSelected ? 'text-red-100' : 'text-stone-500'}`}>
+                        {item.label}
                       </div>
                     </button>
                   );
@@ -223,21 +347,21 @@ export const TripPlanner: React.FC<TripPlannerProps> = ({
 
             {/* Total Budget in INR */}
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-base font-bold text-stone-900 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-stone-900 text-white text-xs flex items-center justify-center font-mono">
-                    3
+              <div className="flex items-center justify-between mb-2.5">
+                <label className="text-sm font-bold text-stone-900 flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-stone-900 text-white text-[11px] flex items-center justify-center font-mono">
+                    5
                   </span>
                   <span className="flex items-center gap-1.5">
                     <Wallet className="w-4 h-4 text-stone-500" />
-                    Trip Budget (INR ₹)
+                    Total Budget
                   </span>
                 </label>
-                <span className="text-xs text-stone-500">Per person total</span>
+                <span className="text-[11px] text-stone-500">₹ INR</span>
               </div>
 
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-500 font-bold text-base">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-stone-500 font-bold text-sm">
                   ₹
                 </div>
                 <input
@@ -245,25 +369,26 @@ export const TripPlanner: React.FC<TripPlannerProps> = ({
                   inputMode="numeric"
                   value={budgetInput}
                   onChange={(e) => handleBudgetChange(e.target.value)}
-                  placeholder="e.g. 10000"
-                  className="w-full pl-8 pr-4 py-3 bg-white border border-stone-300 rounded-xl text-stone-900 font-bold text-base focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:outline-none transition-colors"
+                  placeholder="e.g. 12000"
+                  className="w-full pl-7 pr-3 py-2 bg-white border border-stone-300 rounded-xl text-stone-900 font-bold text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:outline-none transition-colors"
                   required
                 />
               </div>
 
-              {/* Quick Presets */}
-              <div className="flex items-center gap-2 mt-2.5">
-                <span className="text-[11px] text-stone-500 font-medium">Quick Presets:</span>
-                {[5000, 10000, 18000, 30000].map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => setBudgetPreset(preset)}
-                    className="px-2 py-0.5 text-xs bg-stone-200/80 hover:bg-stone-300 text-stone-700 rounded-md transition-colors cursor-pointer"
-                  >
-                    ₹{(preset / 1000)}k
-                  </button>
-                ))}
+              <div className="flex items-center justify-between mt-1 text-[11px]">
+                <span className="text-stone-500">~₹{budgetPerPerson.toLocaleString('en-IN')}/person</span>
+                <div className="flex gap-1">
+                  {[6000, 12000, 24000].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setBudgetPreset(preset)}
+                      className="px-1.5 py-0.2 bg-stone-200 hover:bg-stone-300 text-stone-700 rounded text-[10px]"
+                    >
+                      ₹{preset / 1000}k
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -272,7 +397,7 @@ export const TripPlanner: React.FC<TripPlannerProps> = ({
           <div className="pt-4 border-t border-stone-200">
             <label className="text-base font-bold text-stone-900 flex items-center gap-2 mb-3">
               <span className="w-6 h-6 rounded-full bg-stone-900 text-white text-xs flex items-center justify-center font-mono">
-                4
+                6
               </span>
               Travel Style
             </label>
@@ -312,9 +437,9 @@ export const TripPlanner: React.FC<TripPlannerProps> = ({
             <div className="flex items-center justify-between mb-3">
               <label className="text-base font-bold text-stone-900 flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-stone-900 text-white text-xs flex items-center justify-center font-mono">
-                  5
+                  7
                 </span>
-                Your Travel Interests
+                Core Interests
               </label>
               <span className="text-xs text-stone-500">
                 {selectedInterests.length} selected
@@ -351,6 +476,95 @@ export const TripPlanner: React.FC<TripPlannerProps> = ({
             </div>
           </div>
 
+          {/* 5. Preferences: Preferred Activities, Food & Accommodation */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-stone-200">
+            {/* Preferred Activities */}
+            <div>
+              <label className="text-sm font-bold text-stone-900 flex items-center gap-2 mb-2">
+                <span className="w-5 h-5 rounded-full bg-stone-900 text-white text-[11px] flex items-center justify-center font-mono">
+                  8
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-stone-500" />
+                  Preferred Activities
+                </span>
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {activityOptions.map((act) => {
+                  const isSelected = preferredActivities.includes(act);
+                  return (
+                    <button
+                      key={act}
+                      type="button"
+                      onClick={() => toggleActivity(act)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'bg-stone-900 text-white border-stone-900'
+                          : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300'
+                      }`}
+                    >
+                      {act}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Food Preferences */}
+            <div>
+              <label className="text-sm font-bold text-stone-900 flex items-center gap-2 mb-2">
+                <span className="w-5 h-5 rounded-full bg-stone-900 text-white text-[11px] flex items-center justify-center font-mono">
+                  9
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <UtensilsCrossed className="w-4 h-4 text-stone-500" />
+                  Food Preference
+                </span>
+              </label>
+              <select
+                value={foodPreference}
+                onChange={(e) => setFoodPreference(e.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-stone-300 rounded-xl text-stone-800 text-xs sm:text-sm font-medium focus:ring-2 focus:ring-red-500 focus:outline-none"
+              >
+                {foodOptions.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-stone-500 mt-1.5">
+                Matches authentic local breakfast, lunch, and dinner spots.
+              </p>
+            </div>
+
+            {/* Accommodation Preference */}
+            <div>
+              <label className="text-sm font-bold text-stone-900 flex items-center gap-2 mb-2">
+                <span className="w-5 h-5 rounded-full bg-stone-900 text-white text-[11px] flex items-center justify-center font-mono">
+                  10
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Hotel className="w-4 h-4 text-stone-500" />
+                  Accommodation Style
+                </span>
+              </label>
+              <select
+                value={accommodationPreference}
+                onChange={(e) => setAccommodationPreference(e.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-stone-300 rounded-xl text-stone-800 text-xs sm:text-sm font-medium focus:ring-2 focus:ring-red-500 focus:outline-none"
+              >
+                {accommodationOptions.map((acc) => (
+                  <option key={acc} value={acc}>
+                    {acc}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-stone-500 mt-1.5">
+                Generates multiple options with live pricing and reasons.
+              </p>
+            </div>
+          </div>
+
           {/* Validation Error Message */}
           {validationError && (
             <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-3">
@@ -360,14 +574,33 @@ export const TripPlanner: React.FC<TripPlannerProps> = ({
           )}
 
           {/* Submit Action */}
-          <div className="pt-2 flex justify-center">
+          <div className="pt-2 flex flex-col items-center justify-center gap-3">
             <button
               type="submit"
-              className="w-full sm:w-auto min-w-[280px] px-8 py-4 bg-[#f04141] hover:bg-[#d93030] text-white font-bold text-base uppercase tracking-wider rounded-xl shadow-lg hover:shadow-red-600/30 active:scale-98 transition-all flex items-center justify-center gap-3 cursor-pointer"
+              disabled={isGenerating}
+              className={`w-full sm:w-auto min-w-[320px] px-8 py-4 bg-[#f04141] hover:bg-[#d93030] text-white font-bold text-base uppercase tracking-wider rounded-xl shadow-lg hover:shadow-red-600/30 active:scale-98 transition-all flex items-center justify-center gap-3 cursor-pointer ${
+                isGenerating ? 'opacity-80 cursor-not-allowed' : ''
+              }`}
             >
-              <Compass className="w-5 h-5" />
-              <span>GENERATE MY TRIP</span>
+              {isGenerating ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>ANALYZING LIVE TRAVEL DATA...</span>
+                </>
+              ) : (
+                <>
+                  <Compass className="w-5 h-5" />
+                  <span>GENERATE LIVE ITINERARY</span>
+                </>
+              )}
             </button>
+
+            {isGenerating && (
+              <div className="flex items-center gap-2 text-xs text-stone-500 animate-pulse">
+                <Globe className="w-4 h-4 text-[#f04141]" />
+                <span>Retrieving current attractions, real accommodations, dining, weather & route times...</span>
+              </div>
+            )}
           </div>
         </form>
       </div>

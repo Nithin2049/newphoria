@@ -14,21 +14,31 @@ export type Interest =
   | 'Culture'
   | 'Relaxation';
 
+export interface SourceMeta {
+  title: string;
+  url: string;
+  provider: string;
+}
+
 export interface ActivityItem {
   id: string;
   name: string;
   category: 'Dining' | 'Beach' | 'Heritage' | 'Nature' | 'Shopping' | 'Adventure' | 'Culture' | 'Leisure' | 'Temples';
   description: string;
-  approxCost: number; // in INR
+  approxCost?: number | null; // in INR
+  costDisplay?: string; // e.g. "Free", "₹50", "Price unavailable"
   recommendedDuration: string;
   suitableInterests: Interest[];
   suitableStyles: TravelStyle[];
   locationMapUrl: string;
   recommendedTime: string;
-  defaultDay: 1 | 2 | 3;
-  period: 'morning' | 'midday' | 'afternoon' | 'evening' | 'night';
+  defaultDay?: 1 | 2 | 3;
+  period?: 'morning' | 'midday' | 'afternoon' | 'evening' | 'night';
   image?: string;
   tip?: string;
+  sourceUrl?: string;
+  source?: SourceMeta;
+  verifiedStatus?: 'verified' | 'approximate' | 'unavailable';
 }
 
 export interface TransitInfo {
@@ -60,8 +70,67 @@ export interface TripPlanRequest {
   destination: DestinationId;
   days: 1 | 2 | 3;
   budget: number;
+  travelers?: number;
   travelStyle: TravelStyle;
   interests: Interest[];
+  startDate?: string;
+  preferredActivities?: string[];
+  foodPreference?: string;
+  accommodationPreference?: string;
+}
+
+export interface AccommodationOption {
+  id: string;
+  name: string;
+  type: 'Resort' | 'Hotel' | 'Homestay' | 'Hostel' | 'Villa';
+  location: string;
+  pricePerNight?: number | null;
+  priceDisplay: string; // e.g. "₹4,200 / night" or "Price unavailable — check current price"
+  rating?: number | null;
+  ratingDisplay?: string; // e.g. "4.4 / 5" or "Rating unavailable"
+  reviewCount?: number;
+  amenities: string[];
+  distanceFromItinerary: string;
+  bookingUrl: string;
+  sourceUrl?: string;
+  source?: SourceMeta;
+  reasons: string[];
+  verifiedStatus: 'verified' | 'approximate' | 'unavailable';
+}
+
+export interface MealRecommendation {
+  id: string;
+  mealType: 'Breakfast' | 'Lunch' | 'Dinner';
+  time: string;
+  restaurantName: string;
+  cuisine: string;
+  location: string;
+  approxCostPerPerson?: number | null;
+  priceDisplay: string; // e.g. "~ ₹450 / person" or "Price unavailable"
+  openingHours?: string | null;
+  rating?: number | null;
+  mapUrl: string;
+  websiteUrl?: string;
+  specialty?: string;
+  sourceUrl?: string;
+  source?: SourceMeta;
+  verifiedStatus: 'verified' | 'approximate' | 'unavailable';
+}
+
+export interface TransitSegment {
+  from: string;
+  to: string;
+  approxDistance: string;
+  estimatedTime: string;
+  recommendedOption: string;
+}
+
+export interface WeatherInsight {
+  temperature: number;
+  condition: string;
+  isFavorable: boolean;
+  advice: string;
+  rainRisk: string;
 }
 
 export interface BudgetBreakdown {
@@ -75,6 +144,8 @@ export interface BudgetBreakdown {
   remainingBudget: number;
   isOverBudget: boolean;
   budgetTier: 'Budget' | 'Moderate' | 'Comfort';
+  hasUnpricedItems?: boolean;
+  unpricedItemsNote?: string;
 }
 
 export interface DaySchedule {
@@ -82,6 +153,8 @@ export interface DaySchedule {
   title: string;
   summary: string;
   activities: ActivityItem[];
+  meals?: MealRecommendation[];
+  transitInfo?: TransitSegment;
   estimatedDayCost: number;
 }
 
@@ -91,12 +164,26 @@ export interface GeneratedItinerary {
   destinationName: string;
   destinationState: string;
   days: 1 | 2 | 3;
+  travelers?: number;
   budget: number;
   travelStyle: TravelStyle;
   interests: Interest[];
+  startDate?: string;
+  preferredActivities?: string[];
+  foodPreference?: string;
+  accommodationPreference?: string;
   schedule: DaySchedule[];
+  accommodations?: AccommodationOption[];
+  selectedAccommodationId?: string;
+  weather?: WeatherInsight;
+  routeOptimizationNote?: string;
+  costPerPerson?: number;
   budgetBreakdown: BudgetBreakdown;
   createdAt: string;
+  onlineGrounded?: boolean;
+  onlineSources?: { title: string; url?: string }[];
+  isOfflineFallback?: boolean;
+  dataGroundingNote?: string;
 }
 
 export interface SavedTrip {

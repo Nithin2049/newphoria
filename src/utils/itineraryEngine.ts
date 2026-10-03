@@ -144,7 +144,7 @@ export function generatePersonalizedItinerary(request: TripPlanRequest): Generat
       3: `Experience authentic local heritage, boutique markets, and peaceful retreats before concluding your journey.`,
     };
 
-    const estimatedDayCost = selectedDayActivities.reduce((acc, act) => acc + act.approxCost, 0);
+    const estimatedDayCost = selectedDayActivities.reduce((acc, act) => acc + (act.approxCost || 0), 0);
 
     schedule.push({
       dayNumber: dayNum,
@@ -157,7 +157,7 @@ export function generatePersonalizedItinerary(request: TripPlanRequest): Generat
 
   // Calculate detailed Budget Breakdown
   const totalActivitiesCost = schedule.reduce(
-    (acc, day) => acc + day.activities.reduce((sum, act) => sum + act.approxCost, 0),
+    (acc, day) => acc + day.activities.reduce((sum, act) => sum + (act.approxCost || 0), 0),
     0
   );
 

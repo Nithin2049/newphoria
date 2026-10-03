@@ -9,7 +9,6 @@ import {
   MapPin,
   Compass,
   Cloud,
-  CloudCheck,
   Lock,
   Loader2,
 } from 'lucide-react';

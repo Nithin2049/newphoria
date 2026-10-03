@@ -31,6 +31,7 @@ function MainApp() {
   const [savedTrips, setSavedTrips] = useState<SavedTrip[]>([]);
   const [loadingTrips, setLoadingTrips] = useState(false);
   const [currentItinerary, setCurrentItinerary] = useState<GeneratedItinerary | null>(null);
+  const [isGeneratingTrip, setIsGeneratingTrip] = useState(false);
   const [plannerDestination, setPlannerDestination] = useState<DestinationId>('goa');
   const [activeNavSection, setActiveNavSection] = useState<string>('hero');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -99,24 +100,61 @@ function MainApp() {
     }
   };
 
-  // Handle Generate Trip
-  const handleGenerateItinerary = (request: TripPlanRequest) => {
-    try {
-      const generated = generatePersonalizedItinerary(request);
-      setCurrentItinerary(generated);
-      triggerToast(`Generated customized ${generated.days}-day itinerary for ${generated.destinationName}!`);
+  // Handle Generate Trip via Backend AI & Live Online Search
+  const handleGenerateItinerary = async (request: TripPlanRequest) => {
+    setIsGeneratingTrip(true);
+    triggerToast(`Searching current online travel data for ${request.destination.toUpperCase()}...`);
 
-      setTimeout(() => {
-        const resultsEl = document.getElementById('itinerary-results');
-        if (resultsEl) {
-          const yOffset = -80;
-          const y = resultsEl.getBoundingClientRect().top + window.pageYOffset + yOffset;
-          window.scrollTo({ top: y, behavior: 'smooth' });
-        }
-      }, 100);
-    } catch (err) {
-      console.error(err);
-      triggerToast('Unable to generate itinerary. Please try again.');
+    try {
+      const response = await fetch('/api/itinerary/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server returned HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.success && data.itinerary) {
+        setCurrentItinerary(data.itinerary);
+        triggerToast(
+          `Generated ${data.itinerary.days}-day itinerary for ${data.itinerary.destinationName} using live travel data!`
+        );
+
+        setTimeout(() => {
+          const resultsEl = document.getElementById('itinerary-results');
+          if (resultsEl) {
+            const yOffset = -80;
+            const y = resultsEl.getBoundingClientRect().top + window.pageYOffset + yOffset;
+            window.scrollTo({ top: y, behavior: 'smooth' });
+          }
+        }, 100);
+      } else {
+        throw new Error('Invalid response from itinerary service');
+      }
+    } catch (err: any) {
+      console.warn('Backend API request error, running local engine fallback:', err);
+      // Resilient client-side fallback
+      try {
+        const generated = generatePersonalizedItinerary(request);
+        setCurrentItinerary(generated);
+        triggerToast(`Generated ${generated.days}-day itinerary for ${generated.destinationName}!`);
+        setTimeout(() => {
+          const resultsEl = document.getElementById('itinerary-results');
+          if (resultsEl) {
+            const yOffset = -80;
+            const y = resultsEl.getBoundingClientRect().top + window.pageYOffset + yOffset;
+            window.scrollTo({ top: y, behavior: 'smooth' });
+          }
+        }, 100);
+      } catch (localErr) {
+        console.error(localErr);
+        triggerToast('Unable to generate itinerary. Please try again.');
+      }
+    } finally {
+      setIsGeneratingTrip(false);
     }
   };
 
@@ -259,6 +297,7 @@ function MainApp() {
           key={plannerDestination}
           initialDestination={plannerDestination}
           onGenerateItinerary={handleGenerateItinerary}
+          isGenerating={isGeneratingTrip}
         />
 
         {/* Generated Personalized Itinerary & Budget Breakdown */}
@@ -268,6 +307,7 @@ function MainApp() {
             onSaveTrip={handleSaveTrip}
             isSaved={isCurrentItinerarySaved}
             onScrollToPlanner={() => scrollToSection('plan-trip')}
+            onUpdateItinerary={(updated) => setCurrentItinerary(updated)}
           />
         )}
 

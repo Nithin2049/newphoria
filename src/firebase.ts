@@ -4,13 +4,13 @@ import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getAuth, Auth } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyAHVxziVcl2tgHowEyu-I19yDALHOblIk4',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'newphoria-c73c2.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'newphoria-c73c2',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'newphoria-c73c2.appspot.com',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '615698919659',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:615698919659:web:c1c1b4904f6d78eaab0eae',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-KGXV121T0L',
 };
 
 let app: FirebaseApp;
